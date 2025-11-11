@@ -7,7 +7,7 @@ if (__DEV__) {
 }
 
 import 'react-native-url-polyfill/auto';
-import './src/__create/polyfills';
+import './src/lib/polyfills';
 global.Buffer = require('buffer').Buffer;
 
 import 'expo-router/entry';
@@ -16,8 +16,8 @@ import { App } from 'expo-router/build/qualified-entry';
 import { type ReactNode, memo, useEffect } from 'react';
 import { AppRegistry, LogBox, SafeAreaView, Text, View } from 'react-native';
 import { serializeError } from 'serialize-error';
-import { DeviceErrorBoundaryWrapper } from './__create/DeviceErrorBoundary';
-import { ErrorBoundaryWrapper, SharedErrorBoundary } from './__create/SharedErrorBoundary';
+import { DeviceErrorBoundaryWrapper } from './shared/DeviceErrorBoundary';
+import { ErrorBoundaryWrapper, SharedErrorBoundary } from './shared/SharedErrorBoundary';
 
 if (__DEV__) {
   LogBox.ignoreAllLogs();

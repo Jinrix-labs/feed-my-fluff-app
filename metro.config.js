@@ -2,12 +2,12 @@ const { getDefaultConfig } = require('expo/metro-config');
 const path = require('node:path');
 const fs = require('node:fs');
 const { FileStore } = require('metro-cache');
-const { reportErrorToRemote } = require('./__create/report-error-to-remote');
+const { reportErrorToRemote } = require('./shared/report-error-to-remote');
 const {
   handleResolveRequestError,
   VIRTUAL_ROOT,
   VIRTUAL_ROOT_UNRESOLVED,
-} = require('./__create/handle-resolve-request-error');
+} = require('./shared/handle-resolve-request-error');
 
 /** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(__dirname);
