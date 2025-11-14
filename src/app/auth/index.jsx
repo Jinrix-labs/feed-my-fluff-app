@@ -61,7 +61,7 @@ export default function AuthScreen() {
           [{ text: "OK" }]
         );
       }
-    } catch (error: any) {
+    } catch (error) {
       Alert.alert("Error", error.message || "Failed to send magic link");
     } finally {
       setLoading(false);
@@ -109,7 +109,7 @@ export default function AuthScreen() {
           router.replace("/(tabs)/today");
         }
       }
-    } catch (error: any) {
+    } catch (error) {
       Alert.alert("Error", error.message || "Authentication failed");
     } finally {
       setLoading(false);

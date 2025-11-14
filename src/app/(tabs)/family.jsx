@@ -13,6 +13,7 @@ import {
 } from "@expo-google-fonts/poppins";
 import { getFamily, addFamilyMember, deleteFamilyMember } from "@/lib/family";
 import { getPets, addPet, updatePet, deletePet } from "@/lib/pets";
+import { getActiveFamilyGroup } from "@/lib/familyGroups";
 
 const FAMILY_EMOJIS = ["👨", "👩", "👧", "👦", "🧓", "👴"];
 const PET_EMOJIS = ["🐕", "🐈", "🐰", "🐹", "🐦", "🐢", "🐠", "🐴"];
@@ -29,6 +30,7 @@ export default function FamilyScreen() {
   const [pets, setPets] = useState(cachedPets);
   const [loading, setLoading] = useState(!hasLoadedFamilyData);
   const [hasLoaded, setHasLoaded] = useState(hasLoadedFamilyData);
+  const [groupId, setGroupId] = useState(null);
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [memberFormData, setMemberFormData] = useState({
     name: "",
@@ -75,13 +77,42 @@ export default function FamilyScreen() {
     });
   };
 
+  // Get active family group and fetch data
+  useEffect(() => {
+    const initializeGroup = async () => {
+      try {
+        const group = await getActiveFamilyGroup();
+        if (group) {
+          setGroupId(group.id);
+          await fetchData(group.id);
+        } else {
+          Alert.alert(
+            "No Family Group",
+            "Please create or join a family group first.",
+            [{ text: "OK" }]
+          );
+        }
+      } catch (error) {
+        console.error("Error initializing group:", error);
+        Alert.alert(
+          "Error",
+          `Failed to load family group: ${error.message || error}`
+        );
+      }
+    };
+
+    initializeGroup();
+  }, []);
+
   // Fetch family members and pets from Supabase
-  const fetchData = async () => {
+  const fetchData = async (activeGroupId) => {
+    if (!activeGroupId) return;
+    
     setLoading(!hasLoadedFamilyData);
     try {
       const [familyData, petsData] = await Promise.all([
         getFamily(),
-        getPets(),
+        getPets(activeGroupId),
       ]);
       updateFamilyMembers(familyData || []);
       updatePets(petsData || []);
@@ -97,10 +128,6 @@ export default function FamilyScreen() {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   if (!fontsLoaded || (!hasLoaded && loading)) {
     return (
@@ -176,12 +203,18 @@ export default function FamilyScreen() {
       return;
     }
 
+    if (!groupId) {
+      Alert.alert("Error", "No family group found. Please create or join a group first.");
+      return;
+    }
+
     try {
       const petData = {
         name: petFormData.name.trim(),
         breed: petFormData.breed.trim() || null,
         age: petFormData.age ? parseInt(petFormData.age) : null,
         emoji: petFormData.emoji || "🐕",
+        group_id: groupId,
       };
 
       if (editingPet) {

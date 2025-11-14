@@ -30,7 +30,7 @@ export default function FamilySetupScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
-  const [mode, setMode] = useState<"choose" | "create" | "join">("choose");
+  const [mode, setMode] = useState("choose");
   const [familyName, setFamilyName] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [loading, setLoading] = useState(false);
@@ -80,7 +80,7 @@ export default function FamilySetupScreen() {
           },
         ]
       );
-    } catch (error: any) {
+    } catch (error) {
       Alert.alert("Error", error.message || "Failed to create family group");
     } finally {
       setLoading(false);
@@ -106,7 +106,7 @@ export default function FamilySetupScreen() {
           },
         ]
       );
-    } catch (error: any) {
+    } catch (error) {
       Alert.alert("Error", error.message || "Failed to join family group");
     } finally {
       setLoading(false);

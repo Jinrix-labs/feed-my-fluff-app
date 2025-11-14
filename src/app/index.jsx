@@ -9,7 +9,7 @@ export default function Index() {
   const { session, loading: authLoading } = useSupabaseAuth();
   const { colors } = useTheme();
   const [checkingGroup, setCheckingGroup] = useState(false);
-  const [hasGroup, setHasGroup] = useState<boolean | null>(null);
+  const [hasGroup, setHasGroup] = useState(null);
 
   useEffect(() => {
     if (session && !authLoading) {
