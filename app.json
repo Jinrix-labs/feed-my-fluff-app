@@ -9,6 +9,7 @@
     "scheme": "feedmyfluff",
     "newArchEnabled": true,
     "ios": {
+      "bundleIdentifier": "com.jinrixlabs.feedmyfluff",
       "supportsTablet": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false

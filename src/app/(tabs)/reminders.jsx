@@ -20,6 +20,7 @@ import {
   updateReminder,
   deleteReminder,
 } from "@/lib/reminders";
+import { getActiveFamilyGroup } from "@/lib/familyGroups";
 import {
   useFonts,
   Poppins_400Regular,
@@ -44,6 +45,7 @@ export default function RemindersScreen() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingReminder, setEditingReminder] = useState(null);
+  const [groupId, setGroupId] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
     food_type: "Dry Food",
@@ -69,9 +71,11 @@ export default function RemindersScreen() {
     }
   };
 
-  const loadReminders = async () => {
+  const loadReminders = async (activeGroupId) => {
+    if (!activeGroupId) return;
+    
     try {
-      const data = await getReminders();
+      const data = await getReminders(activeGroupId);
       setReminders(data || []);
     } catch (err) {
       console.error("Error fetching reminders:", err);
@@ -84,8 +88,33 @@ export default function RemindersScreen() {
     }
   };
 
+  // Get active family group on mount
   useEffect(() => {
-    loadReminders();
+    const initializeGroup = async () => {
+      try {
+        const group = await getActiveFamilyGroup();
+        if (group) {
+          setGroupId(group.id);
+          await loadReminders(group.id);
+        } else {
+          setLoading(false);
+          Alert.alert(
+            "No Family Group",
+            "Please create or join a family group to view reminders.",
+            [{ text: "OK" }]
+          );
+        }
+      } catch (error) {
+        console.error("Error initializing group:", error);
+        setLoading(false);
+        Alert.alert(
+          "Error",
+          `Failed to load family group: ${error.message || error}`
+        );
+      }
+    };
+
+    initializeGroup();
     requestNotificationPermissions();
   }, []);
 
@@ -100,16 +129,21 @@ export default function RemindersScreen() {
   }
 
   const handleSaveReminder = async () => {
+    if (!groupId) {
+      Alert.alert("Error", "No family group found. Please create or join a group first.");
+      return;
+    }
+
     try {
       if (editingReminder) {
         await updateReminder(editingReminder.id, formData);
       } else {
         await addReminder({
           ...formData,
-          created_by: 1,
+          group_id: groupId,
         });
       }
-      await loadReminders();
+      await loadReminders(groupId);
       setShowModal(false);
       setEditingReminder(null);
       setFormData({

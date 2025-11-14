@@ -1,5 +1,4 @@
-
-import { useAuth } from '@/utils/auth/useAuth';
+import { useSupabaseAuth } from '@/utils/auth/useSupabaseAuth';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
@@ -20,25 +19,21 @@ const queryClient = new QueryClient({
 });
 
 export default function RootLayout() {
-  const { initiate, isReady } = useAuth();
+  const { loading } = useSupabaseAuth();
   const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
-    initiate();
-  }, [initiate]);
-
-  useEffect(() => {
-    if (isReady) {
+    if (!loading) {
       SplashScreen.hideAsync();
     }
-  }, [isReady]);
+  }, [loading]);
 
   // Show animated splash screen first
   if (showSplash) {
     return <AnimatedSplashScreen onAnimationComplete={() => setShowSplash(false)} />;
   }
 
-  if (!isReady) {
+  if (loading) {
     return null;
   }
 
@@ -50,6 +45,8 @@ export default function RootLayout() {
           initialRouteName="index"
         >
           <Stack.Screen name="index" options={{ animation: "none" }} />
+          <Stack.Screen name="auth" options={{ animation: "fade" }} />
+          <Stack.Screen name="family-setup" options={{ animation: "fade" }} />
           <Stack.Screen name="(tabs)" options={{ animation: "none" }} />
           <Stack.Screen name="settings" options={{ animation: "fade" }} />
         </Stack>

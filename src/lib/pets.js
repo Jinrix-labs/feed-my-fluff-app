@@ -1,9 +1,16 @@
 import { supabase } from "./supabase";
 
-export async function getPets() {
+/**
+ * Get pets for a specific family group
+ * @param {string} groupId - The family group ID
+ */
+export async function getPets(groupId) {
+  if (!groupId) throw new Error("Group ID is required");
+
   const { data, error } = await supabase
     .from("pets")
     .select("*")
+    .eq("group_id", groupId)
     .order("created_at", { ascending: true });
   if (error) throw error;
   return data || [];
@@ -19,7 +26,13 @@ export async function getPet(id) {
   return data;
 }
 
+/**
+ * Add a pet to a family group
+ * @param {Object} pet - Pet data including group_id, name, breed, etc.
+ */
 export async function addPet(pet) {
+  if (!pet.group_id) throw new Error("Group ID is required");
+
   const { data, error } = await supabase
     .from("pets")
     .insert(pet)

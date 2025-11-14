@@ -24,6 +24,7 @@ import {
 import { getFamily } from "@/lib/family";
 import { getPets } from "@/lib/pets";
 import { addFeed } from "@/lib/feeds";
+import { getActiveFamilyGroup } from "@/lib/familyGroups";
 
 export default function AddFeedScreen() {
   const insets = useSafeAreaInsets();
@@ -40,6 +41,7 @@ export default function AddFeedScreen() {
   const [familyMembers, setFamilyMembers] = useState([]);
   const [pets, setPets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [groupId, setGroupId] = useState(null);
 
   const foodTypes = [
     { id: "dry-food", name: "Dry Food", emoji: "🥘" },
@@ -56,11 +58,13 @@ export default function AddFeedScreen() {
   });
 
   // ✅ Fetch directly from Supabase
-  const fetchData = async () => {
+  const fetchData = async (activeGroupId) => {
+    if (!activeGroupId) return;
+    
     try {
       const [familyData, petsData] = await Promise.all([
         getFamily(),
-        getPets(),
+        getPets(activeGroupId),
       ]);
       setFamilyMembers(familyData);
       setPets(petsData);
@@ -77,8 +81,33 @@ export default function AddFeedScreen() {
     }
   };
 
+  // Get active family group on mount
   useEffect(() => {
-    fetchData();
+    const initializeGroup = async () => {
+      try {
+        const group = await getActiveFamilyGroup();
+        if (group) {
+          setGroupId(group.id);
+          await fetchData(group.id);
+        } else {
+          setLoading(false);
+          Alert.alert(
+            "No Family Group",
+            "Please create or join a family group to add feeds.",
+            [{ text: "OK" }]
+          );
+        }
+      } catch (error) {
+        console.error("Error initializing group:", error);
+        setLoading(false);
+        Alert.alert(
+          "Error",
+          `Failed to load family group: ${error.message || error}`
+        );
+      }
+    };
+
+    initializeGroup();
   }, []);
 
   if (!fontsLoaded || loading) {
@@ -127,9 +156,15 @@ export default function AddFeedScreen() {
       return;
     }
 
+    if (!groupId) {
+      Alert.alert("Error", "No family group found. Please create or join a group first.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const feedData = {
+        group_id: groupId,
         family_member_id: selectedMember,
         pet_id: selectedPet,
         food_type: foodTypes.find((f) => f.id === selectedFoodType)?.name,

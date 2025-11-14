@@ -19,6 +19,8 @@ import {
   Poppins_700Bold,
 } from "@expo-google-fonts/poppins";
 import { getFeeds, deleteFeed } from "@/lib/feeds";
+import { getActiveFamilyGroup } from "@/lib/familyGroups";
+import { useRealtimeFeeds } from "@/utils/useRealtimeFeeds";
 
 export default function TodayScreen() {
   const insets = useSafeAreaInsets();
@@ -26,6 +28,7 @@ export default function TodayScreen() {
   const [feeds, setFeeds] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [groupId, setGroupId] = useState(null);
   const scrollY = useRef(new Animated.Value(0)).current;
 
   // For now, assuming current user is admin
@@ -37,10 +40,12 @@ export default function TodayScreen() {
     Poppins_700Bold,
   });
 
-  // Fetch feeds from Supabase
-  const fetchFeeds = async () => {
+  // Fetch feeds from Supabase for a specific group
+  const fetchFeeds = async (activeGroupId) => {
+    if (!activeGroupId) return;
+    
     try {
-      const data = await getFeeds();
+      const data = await getFeeds(activeGroupId);
       setFeeds(data || []);
     } catch (error) {
       console.error("Error fetching feeds:", error);
@@ -53,9 +58,44 @@ export default function TodayScreen() {
     }
   };
 
+  // Get active family group and fetch feeds
   useEffect(() => {
-    fetchFeeds();
+    const initializeGroup = async () => {
+      try {
+        const group = await getActiveFamilyGroup();
+        if (group) {
+          setGroupId(group.id);
+          await fetchFeeds(group.id);
+        } else {
+          // No group - user needs to create or join one
+          setLoading(false);
+          Alert.alert(
+            "No Family Group",
+            "Please create or join a family group to view feeds.",
+            [{ text: "OK" }]
+          );
+        }
+      } catch (error) {
+        console.error("Error initializing group:", error);
+        setLoading(false);
+        Alert.alert(
+          "Error",
+          `Failed to load family group: ${error.message || error}`
+        );
+      }
+    };
+
+    initializeGroup();
   }, []);
+
+  // Subscribe to realtime feed updates
+  useRealtimeFeeds(groupId, (payload) => {
+    console.log("Feed changed:", payload.eventType);
+    // Refresh feeds when any change occurs
+    if (groupId) {
+      fetchFeeds(groupId);
+    }
+  });
 
   if (!fontsLoaded || loading) {
     return (
@@ -68,8 +108,9 @@ export default function TodayScreen() {
   }
 
   const handleRefresh = async () => {
+    if (!groupId) return;
     setRefreshing(true);
-    await fetchFeeds();
+    await fetchFeeds(groupId);
     setRefreshing(false);
   };
 
