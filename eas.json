@@ -36,6 +36,10 @@
 			"autoIncrement": true,
 			"android": {
 				"buildType": "apk"
+			},
+			"env": {
+				"EXPO_PUBLIC_SUPABASE_URL": "https: //mqmbequgylfucqdlxcif.supabase.co",
+				"EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1xbWJlcXVneWxmdWNxZGx4Y2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3MzY3NjIsImV4cCI6MjA3ODMxMjc2Mn0.r8H42ATdSObEqZXqyOA5REduhKDLCLvBipOaomxlJhI"
 			}
 		}
 	},
