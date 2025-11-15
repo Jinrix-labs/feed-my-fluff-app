@@ -1,6 +1,6 @@
 import { Redirect } from "expo-router";
 import { useSupabaseAuth } from "@/utils/auth/useSupabaseAuth";
-import { View, ActivityIndicator } from "react-native";
+import { View, ActivityIndicator, Text, ScrollView } from "react-native";
 import { useTheme } from "@/utils/theme";
 import { useEffect, useState } from "react";
 import { getActiveFamilyGroup } from "@/lib/familyGroups";
@@ -10,9 +10,17 @@ export default function Index() {
   const { colors } = useTheme();
   const [checkingGroup, setCheckingGroup] = useState(false);
   const [hasGroup, setHasGroup] = useState(null);
+  const [supabaseConfigured, setSupabaseConfigured] = useState(true);
+
+  // Check if Supabase is configured
+  useEffect(() => {
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+    setSupabaseConfigured(!!(supabaseUrl && supabaseKey));
+  }, []);
 
   useEffect(() => {
-    if (session && !authLoading) {
+    if (session && !authLoading && supabaseConfigured) {
       setCheckingGroup(true);
       getActiveFamilyGroup()
         .then((group) => {
@@ -24,7 +32,31 @@ export default function Index() {
           setCheckingGroup(false);
         });
     }
-  }, [session, authLoading]);
+  }, [session, authLoading, supabaseConfigured]);
+
+  // Show error if Supabase not configured
+  if (!supabaseConfigured) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: "center", alignItems: "center", padding: 24 }}>
+        <ScrollView contentContainerStyle={{ alignItems: "center" }}>
+          <Text style={{ fontSize: 48, marginBottom: 24 }}>⚠️</Text>
+          <Text style={{ fontSize: 24, fontWeight: "bold", color: colors.text, marginBottom: 16, textAlign: "center" }}>
+            Configuration Error
+          </Text>
+          <Text style={{ fontSize: 16, color: colors.textSecondary, textAlign: "center", marginBottom: 24, lineHeight: 24 }}>
+            Supabase environment variables are missing.
+          </Text>
+          <Text style={{ fontSize: 14, color: colors.textMuted, textAlign: "center", lineHeight: 20 }}>
+            For EAS builds, set secrets using:{'\n\n'}
+            <Text style={{ fontFamily: "monospace", backgroundColor: colors.surface, padding: 8, borderRadius: 4 }}>
+              eas secret:create --scope project --name EXPO_PUBLIC_SUPABASE_URL --value your-url{'\n'}
+              eas secret:create --scope project --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value your-key
+            </Text>
+          </Text>
+        </ScrollView>
+      </View>
+    );
+  }
 
   if (authLoading || checkingGroup) {
     return (
