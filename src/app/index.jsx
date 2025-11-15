@@ -4,6 +4,8 @@ import { View, ActivityIndicator, Text, ScrollView } from "react-native";
 import { useTheme } from "@/utils/theme";
 import { useEffect, useState } from "react";
 import { getActiveFamilyGroup } from "@/lib/familyGroups";
+import Constants from 'expo-constants';
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 export default function Index() {
   const { session, loading: authLoading } = useSupabaseAuth();
@@ -14,9 +16,11 @@ export default function Index() {
 
   // Check if Supabase is configured
   useEffect(() => {
-    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-    setSupabaseConfigured(!!(supabaseUrl && supabaseKey));
+    // Check both expo-constants and process.env
+    const supabaseUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL;
+    const supabaseKey = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+    const configured = !!(supabaseUrl && supabaseKey && supabaseUrl !== '' && supabaseKey !== '');
+    setSupabaseConfigured(configured);
   }, []);
 
   useEffect(() => {
