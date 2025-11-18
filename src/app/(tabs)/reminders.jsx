@@ -22,6 +22,12 @@ import {
 } from "@/lib/reminders";
 import { getActiveFamilyGroup } from "@/lib/familyGroups";
 import {
+  scheduleReminderNotifications,
+  cancelReminderNotificationsById,
+  rescheduleReminderNotifications,
+  scheduleAllReminders,
+} from "@/lib/notificationScheduler";
+import {
   useFonts,
   Poppins_400Regular,
   Poppins_500Medium,
@@ -32,7 +38,8 @@ import {
 // Set up notification handler
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    shouldShowBanner: true,    // Shows the banner notification
+    shouldShowList: true,      // Shows in notification list
     shouldPlaySound: true,
     shouldSetBadge: true,
   }),
@@ -52,6 +59,8 @@ export default function RemindersScreen() {
     reminder_time: "08:00",
     days_of_week: [1, 2, 3, 4, 5, 6, 7],
   });
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [tempTime, setTempTime] = useState({ hours: 8, minutes: 0, isPM: false });
 
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
@@ -77,6 +86,16 @@ export default function RemindersScreen() {
     try {
       const data = await getReminders(activeGroupId);
       setReminders(data || []);
+      
+      // Schedule all active reminders
+      if (data && data.length > 0) {
+        try {
+          await scheduleAllReminders(data);
+        } catch (error) {
+          console.error("Error scheduling reminders:", error);
+          // Don't show alert for scheduling errors, just log them
+        }
+      }
     } catch (err) {
       console.error("Error fetching reminders:", err);
       Alert.alert(
@@ -135,13 +154,34 @@ export default function RemindersScreen() {
     }
 
     try {
+      let savedReminder;
       if (editingReminder) {
-        await updateReminder(editingReminder.id, formData);
+        savedReminder = await updateReminder(editingReminder.id, formData);
+        // Reschedule notifications for updated reminder
+        try {
+          await rescheduleReminderNotifications({
+            ...savedReminder,
+            ...formData,
+          });
+        } catch (notifError) {
+          console.error("Error rescheduling notifications:", notifError);
+          // Continue even if notification scheduling fails
+        }
       } else {
-        await addReminder({
+        savedReminder = await addReminder({
           ...formData,
           group_id: groupId,
         });
+        // Schedule notifications for new reminder
+        try {
+          await scheduleReminderNotifications({
+            ...savedReminder,
+            ...formData,
+          });
+        } catch (notifError) {
+          console.error("Error scheduling notifications:", notifError);
+          // Continue even if notification scheduling fails
+        }
       }
       await loadReminders(groupId);
       setShowModal(false);
@@ -152,6 +192,8 @@ export default function RemindersScreen() {
         reminder_time: "08:00",
         days_of_week: [1, 2, 3, 4, 5, 6, 7],
       });
+      setTempTime({ hours: 8, minutes: 0, isPM: false });
+      setShowTimePicker(false);
     } catch (error) {
       console.error("Error saving reminder:", error);
       Alert.alert(
@@ -163,6 +205,14 @@ export default function RemindersScreen() {
 
   const handleDeleteReminder = async (id) => {
     try {
+      // Cancel notifications before deleting
+      try {
+        await cancelReminderNotificationsById(id);
+      } catch (notifError) {
+        console.error("Error canceling notifications:", notifError);
+        // Continue with deletion even if canceling notifications fails
+      }
+      
       await deleteReminder(id);
       setReminders(reminders.filter((r) => r.id !== id));
     } catch (error) {
@@ -176,12 +226,31 @@ export default function RemindersScreen() {
 
   const handleToggleReminder = async (reminder) => {
     try {
+      const newActiveState = !reminder.is_active;
       await updateReminder(reminder.id, {
-        is_active: !reminder.is_active,
+        is_active: newActiveState,
       });
+      
+      // Schedule or cancel notifications based on active state
+      try {
+        if (newActiveState) {
+          // Schedule notifications for activated reminder
+          await scheduleReminderNotifications({
+            ...reminder,
+            is_active: true,
+          });
+        } else {
+          // Cancel notifications for deactivated reminder
+          await cancelReminderNotificationsById(reminder.id);
+        }
+      } catch (notifError) {
+        console.error("Error updating notifications:", notifError);
+        // Continue even if notification update fails
+      }
+      
       setReminders(
         reminders.map((r) =>
-          r.id === reminder.id ? { ...r, is_active: !r.is_active } : r,
+          r.id === reminder.id ? { ...r, is_active: newActiveState } : r,
         ),
       );
     } catch (error) {
@@ -195,13 +264,77 @@ export default function RemindersScreen() {
 
   const openEditModal = (reminder) => {
     setEditingReminder(reminder);
+    const timeStr = reminder.reminder_time.substring(0, 5); // HH:MM format
+    const [hours24, minutes] = timeStr.split(":").map(Number);
+    
+    // Convert 24-hour to 12-hour format
+    let hours12 = hours24 % 12;
+    if (hours12 === 0) hours12 = 12;
+    const isPM = hours24 >= 12;
+    
     setFormData({
       name: reminder.name,
       food_type: reminder.food_type,
-      reminder_time: reminder.reminder_time.substring(0, 5), // HH:MM format
+      reminder_time: timeStr,
       days_of_week: reminder.days_of_week,
     });
+    setTempTime({ hours: hours12, minutes, isPM });
     setShowModal(true);
+  };
+
+  const handleTimePickerOpen = () => {
+    // Parse current time from formData
+    const timeStr = formData.reminder_time;
+    const [hours24, minutes] = timeStr.split(":").map(Number);
+    let hours12 = hours24 % 12;
+    if (hours12 === 0) hours12 = 12;
+    const isPM = hours24 >= 12;
+    setTempTime({ hours: hours12, minutes, isPM });
+    setShowTimePicker(true);
+  };
+
+  const handleTimeConfirm = () => {
+    // Convert 12-hour to 24-hour format
+    let hours24 = tempTime.hours;
+    if (tempTime.isPM && hours24 !== 12) {
+      hours24 += 12;
+    } else if (!tempTime.isPM && hours24 === 12) {
+      hours24 = 0;
+    }
+    const timeStr = `${String(hours24).padStart(2, "0")}:${String(tempTime.minutes).padStart(2, "0")}`;
+    setFormData({ ...formData, reminder_time: timeStr });
+    setShowTimePicker(false);
+  };
+
+  const updateTime = (field, value) => {
+    if (field === "hours") {
+      let newHours = parseInt(value) || 1;
+      if (newHours < 1) newHours = 1;
+      if (newHours > 12) newHours = 12;
+      setTempTime({ ...tempTime, hours: newHours });
+    } else if (field === "minutes") {
+      let newMinutes = parseInt(value) || 0;
+      if (newMinutes < 0) newMinutes = 0;
+      if (newMinutes > 59) newMinutes = 59;
+      setTempTime({ ...tempTime, minutes: newMinutes });
+    } else if (field === "isPM") {
+      setTempTime({ ...tempTime, isPM: value });
+    }
+  };
+
+  const toggleDay = (dayNumber) => {
+    const currentDays = formData.days_of_week;
+    if (currentDays.includes(dayNumber)) {
+      setFormData({
+        ...formData,
+        days_of_week: currentDays.filter((d) => d !== dayNumber),
+      });
+    } else {
+      setFormData({
+        ...formData,
+        days_of_week: [...currentDays, dayNumber].sort(),
+      });
+    }
   };
 
   return (
@@ -264,7 +397,18 @@ export default function RemindersScreen() {
             </View>
 
             <TouchableOpacity
-              onPress={() => setShowModal(true)}
+              onPress={() => {
+      setShowTimePicker(false);
+      setEditingReminder(null);
+      setFormData({
+        name: "",
+        food_type: "Dry Food",
+        reminder_time: "08:00",
+        days_of_week: [1, 2, 3, 4, 5, 6, 7],
+      });
+      setTempTime({ hours: 8, minutes: 0, isPM: false });
+                setShowModal(true);
+              }}
               style={{
                 width: 44,
                 height: 44,
@@ -491,6 +635,8 @@ export default function RemindersScreen() {
             reminder_time: "08:00",
             days_of_week: [1, 2, 3, 4, 5, 6, 7],
           });
+          setTempTime({ hours: 8, minutes: 0, isPM: false });
+          setShowTimePicker(false);
         }}
       >
         <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -515,6 +661,14 @@ export default function RemindersScreen() {
                 onPress={() => {
                   setShowModal(false);
                   setEditingReminder(null);
+                  setFormData({
+                    name: "",
+                    food_type: "Dry Food",
+                    reminder_time: "08:00",
+                    days_of_week: [1, 2, 3, 4, 5, 6, 7],
+                  });
+                  setTempTime({ hours: 8, minutes: 0, isPM: false });
+                  setShowTimePicker(false);
                 }}
               >
                 <Text
@@ -633,7 +787,351 @@ export default function RemindersScreen() {
                   </Text>
                 </TouchableOpacity>
               ))}
+
+              <Text
+                style={{
+                  fontFamily: "Poppins_500Medium",
+                  fontSize: 16,
+                  color: colors.text,
+                  marginTop: 24,
+                  marginBottom: 12,
+                }}
+              >
+                Reminder Time
+              </Text>
+
+              <TouchableOpacity
+                onPress={handleTimePickerOpen}
+                style={{
+                  backgroundColor: colors.surface,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: 12,
+                  padding: 16,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 24,
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Clock size={20} color={colors.primary} style={{ marginRight: 12 }} />
+                  <Text
+                    style={{
+                      fontFamily: "Poppins_500Medium",
+                      fontSize: 16,
+                      color: colors.text,
+                    }}
+                  >
+                    {formData.reminder_time}
+                  </Text>
+                </View>
+                <Text
+                  style={{
+                    fontFamily: "Poppins_400Regular",
+                    fontSize: 14,
+                    color: colors.textSecondary,
+                  }}
+                >
+                  Tap to change
+                </Text>
+              </TouchableOpacity>
+
+              <Text
+                style={{
+                  fontFamily: "Poppins_500Medium",
+                  fontSize: 16,
+                  color: colors.text,
+                  marginBottom: 12,
+                }}
+              >
+                Days of Week
+              </Text>
+
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  marginBottom: 24,
+                  gap: 8,
+                }}
+              >
+                {dayNames.map((day, index) => {
+                  const dayNumber = index + 1;
+                  const isSelected = formData.days_of_week.includes(dayNumber);
+                  return (
+                    <TouchableOpacity
+                      key={day}
+                      onPress={() => toggleDay(dayNumber)}
+                      style={{
+                        backgroundColor: isSelected
+                          ? colors.primaryBackground
+                          : colors.surface,
+                        borderWidth: 1,
+                        borderColor: isSelected
+                          ? colors.primary
+                          : colors.border,
+                        borderRadius: 12,
+                        paddingHorizontal: 16,
+                        paddingVertical: 12,
+                        minWidth: 60,
+                        alignItems: "center",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontFamily: "Poppins_500Medium",
+                          fontSize: 14,
+                          color: isSelected
+                            ? colors.primary
+                            : colors.text,
+                        }}
+                      >
+                        {day}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Time Picker Modal */}
+      <Modal
+        visible={showTimePicker}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowTimePicker(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "flex-end",
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: colors.surface,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              padding: 24,
+              paddingBottom: insets.bottom + 24,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: "Poppins_700Bold",
+                fontSize: 20,
+                color: colors.text,
+                marginBottom: 24,
+              }}
+            >
+              Select Time
+            </Text>
+
+            {/* Time Selection */}
+            <View
+              style={{
+                flexDirection: "row",
+                gap: 12,
+                marginBottom: 24,
+                alignItems: "center",
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <TextInput
+                  value={tempTime.hours.toString()}
+                  onChangeText={(text) => updateTime("hours", text)}
+                  keyboardType="number-pad"
+                  maxLength={2}
+                  style={{
+                    backgroundColor: colors.background,
+                    borderWidth: 2,
+                    borderColor: colors.border,
+                    borderRadius: 12,
+                    padding: 16,
+                    fontFamily: "Poppins_400Regular",
+                    fontSize: 24,
+                    color: colors.text,
+                    textAlign: "center",
+                  }}
+                  placeholder="12"
+                />
+                <Text
+                  style={{
+                    fontFamily: "Poppins_400Regular",
+                    fontSize: 12,
+                    color: colors.textMuted,
+                    textAlign: "center",
+                    marginTop: 4,
+                  }}
+                >
+                  Hour
+                </Text>
+              </View>
+
+              <Text
+                style={{
+                  fontFamily: "Poppins_700Bold",
+                  fontSize: 24,
+                  color: colors.text,
+                  marginTop: -20,
+                }}
+              >
+                :
+              </Text>
+
+              <View style={{ flex: 1 }}>
+                <TextInput
+                  value={tempTime.minutes.toString().padStart(2, "0")}
+                  onChangeText={(text) => updateTime("minutes", text)}
+                  keyboardType="number-pad"
+                  maxLength={2}
+                  style={{
+                    backgroundColor: colors.background,
+                    borderWidth: 2,
+                    borderColor: colors.border,
+                    borderRadius: 12,
+                    padding: 16,
+                    fontFamily: "Poppins_400Regular",
+                    fontSize: 24,
+                    color: colors.text,
+                    textAlign: "center",
+                  }}
+                  placeholder="00"
+                />
+                <Text
+                  style={{
+                    fontFamily: "Poppins_400Regular",
+                    fontSize: 12,
+                    color: colors.textMuted,
+                    textAlign: "center",
+                    marginTop: 4,
+                  }}
+                >
+                  Minute
+                </Text>
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    gap: 8,
+                    marginTop: 8,
+                  }}
+                >
+                  <TouchableOpacity
+                    onPress={() => updateTime("isPM", false)}
+                    style={{
+                      flex: 1,
+                      backgroundColor: !tempTime.isPM
+                        ? colors.primaryBackground
+                        : colors.background,
+                      borderWidth: 2,
+                      borderColor: !tempTime.isPM
+                        ? colors.primary
+                        : colors.border,
+                      borderRadius: 12,
+                      padding: 12,
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontFamily: "Poppins_600SemiBold",
+                        fontSize: 16,
+                        color: !tempTime.isPM
+                          ? colors.primary
+                          : colors.text,
+                      }}
+                    >
+                      AM
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => updateTime("isPM", true)}
+                    style={{
+                      flex: 1,
+                      backgroundColor: tempTime.isPM
+                        ? colors.primaryBackground
+                        : colors.background,
+                      borderWidth: 2,
+                      borderColor: tempTime.isPM
+                        ? colors.primary
+                        : colors.border,
+                      borderRadius: 12,
+                      padding: 12,
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontFamily: "Poppins_600SemiBold",
+                        fontSize: 16,
+                        color: tempTime.isPM
+                          ? colors.primary
+                          : colors.text,
+                      }}
+                    >
+                      PM
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
+            {/* Buttons */}
+            <View
+              style={{
+                flexDirection: "row",
+                gap: 12,
+              }}
+            >
+              <TouchableOpacity
+                onPress={() => setShowTimePicker(false)}
+                style={{
+                  flex: 1,
+                  backgroundColor: colors.border,
+                  borderRadius: 12,
+                  padding: 16,
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: "Poppins_600SemiBold",
+                    fontSize: 16,
+                    color: colors.text,
+                  }}
+                >
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleTimeConfirm}
+                style={{
+                  flex: 1,
+                  backgroundColor: colors.primary,
+                  borderRadius: 12,
+                  padding: 16,
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: "Poppins_600SemiBold",
+                    fontSize: 16,
+                    color: "#FFFFFF",
+                  }}
+                >
+                  Confirm
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
