@@ -1,10 +1,13 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Image, Animated, StyleSheet } from 'react-native';
+import { View, Image, Animated, StyleSheet, Platform } from 'react-native';
 
 const AnimatedSplashScreen = ({ onAnimationComplete }) => {
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(1.3)).current;
     const pressAnim = useRef(new Animated.Value(0)).current;
+    
+    // Native driver not supported on web
+    const useNativeDriver = Platform.OS !== 'web';
 
     useEffect(() => {
         // Initial fade in with scale down (paw coming towards screen)
@@ -12,12 +15,12 @@ const AnimatedSplashScreen = ({ onAnimationComplete }) => {
             Animated.timing(fadeAnim, {
                 toValue: 1,
                 duration: 400,
-                useNativeDriver: true,
+                useNativeDriver,
             }),
             Animated.timing(scaleAnim, {
                 toValue: 1,
                 duration: 400,
-                useNativeDriver: true,
+                useNativeDriver,
             }),
         ]).start(() => {
             // After landing, do the "press" effect
@@ -27,14 +30,14 @@ const AnimatedSplashScreen = ({ onAnimationComplete }) => {
                     toValue: 1,
                     tension: 100,
                     friction: 5,
-                    useNativeDriver: true,
+                    useNativeDriver,
                 }),
                 // Release back
                 Animated.spring(pressAnim, {
                     toValue: 0,
                     tension: 50,
                     friction: 7,
-                    useNativeDriver: true,
+                    useNativeDriver,
                 }),
             ]).start(() => {
                 // After press animation completes, wait then fade out
@@ -43,12 +46,12 @@ const AnimatedSplashScreen = ({ onAnimationComplete }) => {
                         Animated.timing(fadeAnim, {
                             toValue: 0,
                             duration: 400,
-                            useNativeDriver: true,
+                            useNativeDriver,
                         }),
                         Animated.timing(scaleAnim, {
                             toValue: 0.8,
                             duration: 400,
-                            useNativeDriver: true,
+                            useNativeDriver,
                         }),
                     ]).start(() => {
                         onAnimationComplete?.();

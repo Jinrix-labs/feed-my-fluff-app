@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 import { useTheme } from "@/utils/theme";
 import {
   useFonts,
@@ -29,13 +29,22 @@ export default function AuthScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState("signin");
 
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
     Poppins_500Medium,
     Poppins_700Bold,
   });
+
+  // Memoize content container style to prevent re-renders and flickering
+  const contentContainerStyle = useMemo(() => ({
+    flexGrow: 1,
+    paddingTop: insets.top + 40,
+    paddingBottom: insets.bottom + 40,
+    paddingHorizontal: 24,
+    backgroundColor: colors.background,
+  }), [insets.top, insets.bottom, colors.background]);
 
   const handleMagicLink = async () => {
     if (!email) {
@@ -45,6 +54,13 @@ export default function AuthScreen() {
 
     setLoading(true);
     try {
+      const supabase = await getSupabase();
+      if (!supabase) {
+        Alert.alert("Error", "Supabase not initialized");
+        setLoading(false);
+        return;
+      }
+      
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
@@ -81,6 +97,13 @@ export default function AuthScreen() {
 
     setLoading(true);
     try {
+      const supabase = await getSupabase();
+      if (!supabase) {
+        Alert.alert("Error", "Supabase not initialized");
+        setLoading(false);
+        return;
+      }
+      
       if (mode === "signup") {
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -89,7 +112,12 @@ export default function AuthScreen() {
 
         if (error) {
           Alert.alert("Error", error.message);
+        } else if (data.session) {
+          // Email confirmation is disabled, user is automatically signed in
+          // Navigation will happen automatically via auth state listener
+          router.replace("/(tabs)/today");
         } else {
+          // Email confirmation is enabled, user needs to verify email
           Alert.alert(
             "Success! 🎉",
             "Account created! Please check your email to verify your account.",
@@ -116,13 +144,14 @@ export default function AuthScreen() {
     }
   };
 
-  if (!fontsLoaded) {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: "center", alignItems: "center" }}>
-        <Text style={{ fontFamily: "Poppins_400Regular", color: colors.textMuted }}>Loading...</Text>
-      </View>
-    );
-  }
+  // Don't block on fonts - show content immediately
+  // if (!fontsLoaded) {
+  //   return (
+  //     <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: "center", alignItems: "center" }}>
+  //       <Text style={{ fontFamily: "Poppins_400Regular", color: colors.textMuted }}>Loading...</Text>
+  //     </View>
+  //   );
+  // }
 
   return (
     <KeyboardAvoidingView
@@ -131,13 +160,10 @@ export default function AuthScreen() {
     >
       <StatusBar style={isDark ? "light" : "dark"} />
       <ScrollView
-        contentContainerStyle={{
-          flexGrow: 1,
-          paddingTop: insets.top + 40,
-          paddingBottom: insets.bottom + 40,
-          paddingHorizontal: 24,
-        }}
+        contentContainerStyle={contentContainerStyle}
+        style={{ backgroundColor: colors.background }}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
         {/* Header */}
         <View style={{ alignItems: "center", marginBottom: 48 }}>
@@ -160,6 +186,8 @@ export default function AuthScreen() {
               fontSize: 32,
               color: colors.text,
               marginBottom: 8,
+              numberOfLines: 1,
+              allowFontScaling: false,
             }}
           >
             FeedMyFluff
@@ -218,8 +246,8 @@ export default function AuthScreen() {
             />
           </View>
 
-          {/* Password Input (only for email/password mode) */}
-          {mode === "signin" && (
+          {/* Password Input (for both signin and signup) */}
+          {(mode === "signin" || mode === "signup") && (
             <View style={{ marginBottom: 20 }}>
               <View
                 style={{

@@ -86,6 +86,8 @@ export default function FamilyScreen() {
           setGroupId(group.id);
           await fetchData(group.id);
         } else {
+          setLoading(false);
+          setHasLoaded(true);
           Alert.alert(
             "No Family Group",
             "Please create or join a family group first.",
@@ -94,6 +96,8 @@ export default function FamilyScreen() {
         }
       } catch (error) {
         console.error("Error initializing group:", error);
+        setLoading(false);
+        setHasLoaded(true);
         Alert.alert(
           "Error",
           `Failed to load family group: ${error.message || error}`

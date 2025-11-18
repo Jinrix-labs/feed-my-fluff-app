@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Constants from 'expo-constants';
-import { supabase } from '@/lib/supabase';
+import { getSupabase } from '@/lib/supabase';
 
 /**
  * Hook for Supabase authentication
@@ -15,43 +15,73 @@ export function useSupabaseAuth() {
     const supabaseUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL;
     const supabaseKey = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
     
+    console.log('🔍 [useSupabaseAuth] Config check:', {
+      hasUrl: !!supabaseUrl,
+      hasKey: !!supabaseKey,
+      urlFromConstants: !!Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL,
+      urlFromEnv: !!process.env.EXPO_PUBLIC_SUPABASE_URL
+    });
+    
     if (!supabaseUrl || !supabaseKey || supabaseUrl === '' || supabaseKey === '') {
-      console.error("Supabase not configured - environment variables missing");
+      console.error("⚠️ [useSupabaseAuth] Supabase not configured - environment variables missing");
       setLoading(false);
       return;
     }
-
-    // Safely get initial session with error handling
-    let subscription = null;
     
-    try {
-      supabase.auth.getSession()
-        .then(({ data: { session }, error }) => {
-          if (error) {
-            console.error("Error getting Supabase session:", error);
-          } else {
-            setSession(session);
-          }
-          setLoading(false);
-        })
-        .catch((error) => {
-          console.error("Error getting Supabase session:", error);
-          setLoading(false);
-        });
+    console.log('🔍 [useSupabaseAuth] Supabase configured, initializing auth...');
 
-      // Listen for auth changes
-      const authStateChange = supabase.auth.onAuthStateChange((_event, session) => {
-        setSession(session);
+    // Set initial state - we'll update when we get the actual session
+    setLoading(true);
+    setSession(null);
+    
+    let subscription = null;
+    let setupTimeout = null;
+    
+    // Get Supabase client asynchronously (non-blocking)
+    getSupabase().then(supabaseClient => {
+      if (!supabaseClient) {
+        console.warn("⚠️ [useSupabaseAuth] Supabase client not initialized - skipping auth check");
+        setLoading(false);
+        return;
+      }
+      
+      // Check for existing session first
+      supabaseClient.auth.getSession().then(({ data, error }) => {
+        if (error) {
+          console.error("❌ [useSupabaseAuth] Error getting session:", error);
+        } else {
+          console.log("🔍 [useSupabaseAuth] Initial session check:", data.session ? "Has session" : "No session");
+          setSession(data.session);
+        }
+        setLoading(false);
+      }).catch(err => {
+        console.error("❌ [useSupabaseAuth] Error in getSession:", err);
         setLoading(false);
       });
       
-      subscription = authStateChange.data.subscription;
-    } catch (error) {
-      console.error("Error initializing Supabase auth:", error);
+      // Set up auth listener for future changes
+      try {
+        console.log("🔍 [useSupabaseAuth] Setting up auth state listener...");
+        
+        const authStateChange = supabaseClient.auth.onAuthStateChange((_event, session) => {
+          console.log("🔄 [useSupabaseAuth] Auth state changed:", _event, session ? "Authenticated" : "Not authenticated");
+          setSession(session);
+          setLoading(false); // Ensure loading is false after any state change
+        });
+        
+        subscription = authStateChange.data.subscription;
+        console.log("✅ [useSupabaseAuth] Auth state listener set up successfully");
+      } catch (error) {
+        console.error("❌ [useSupabaseAuth] Error setting up auth listener:", error);
+        setLoading(false);
+      }
+    }).catch(err => {
+      console.error("❌ [useSupabaseAuth] Error getting Supabase client:", err);
       setLoading(false);
-    }
+    });
 
     return () => {
+      if (setupTimeout) clearTimeout(setupTimeout);
       if (subscription) {
         try {
           subscription.unsubscribe();
@@ -64,7 +94,10 @@ export function useSupabaseAuth() {
 
   const signOut = async () => {
     try {
-      await supabase.auth.signOut();
+      const supabase = await getSupabase();
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
     } catch (error) {
       console.error("Error signing out:", error);
     }
@@ -78,4 +111,3 @@ export function useSupabaseAuth() {
     isAuthenticated: !!session,
   };
 }
-

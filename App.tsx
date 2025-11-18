@@ -1,12 +1,12 @@
 import { usePathname, useRouter } from 'expo-router';
 import { App } from 'expo-router/build/qualified-entry';
 import React, { memo, useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import { ErrorBoundaryWrapper } from './shared/SharedErrorBoundary';
 import './src/lib/polyfills';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Toaster } from 'sonner-native';
 import { AlertModal } from './polyfills/web/alerts.web';
-import './global.css';
 
 const GlobalErrorReporter = () => {
   useEffect(() => {
@@ -36,15 +36,19 @@ const Wrapper = memo(() => {
   return (
     <ErrorBoundaryWrapper>
       <SafeAreaProvider
-        initialMetrics={{
-          insets: { top: 64, bottom: 34, left: 0, right: 0 },
-          frame: {
-            x: 0,
-            y: 0,
-            width: typeof window === 'undefined' ? 390 : window.innerWidth,
-            height: typeof window === 'undefined' ? 844 : window.innerHeight,
-          },
-        }}
+        initialMetrics={
+          Platform.OS === 'web' && typeof window !== 'undefined'
+            ? {
+                insets: { top: 64, bottom: 34, left: 0, right: 0 },
+                frame: {
+                  x: 0,
+                  y: 0,
+                  width: window.innerWidth,
+                  height: window.innerHeight,
+                },
+              }
+            : undefined
+        }
       >
         <App />
         <GlobalErrorReporter />
@@ -53,6 +57,7 @@ const Wrapper = memo(() => {
     </ErrorBoundaryWrapper>
   );
 });
+
 const healthyResponse = {
   type: 'sandbox:mobile:healthcheck:response',
   healthy: true,
@@ -60,6 +65,11 @@ const healthyResponse = {
 
 const useHandshakeParent = () => {
   useEffect(() => {
+    // Only run on web
+    if (Platform.OS !== 'web' || typeof window === 'undefined') {
+      return;
+    }
+
     const handleMessage = (event: MessageEvent) => {
       if (event.data.type === 'sandbox:mobile:healthcheck') {
         window.parent.postMessage(healthyResponse, '*');
@@ -81,6 +91,11 @@ const CreateApp = () => {
   useHandshakeParent();
 
   useEffect(() => {
+    // Only run on web
+    if (Platform.OS !== 'web' || typeof window === 'undefined') {
+      return;
+    }
+
     const handleMessage = (event: MessageEvent) => {
       if (event.data.type === 'sandbox:navigation' && event.data.pathname !== pathname) {
         router.push(event.data.pathname);
@@ -95,6 +110,11 @@ const CreateApp = () => {
   }, [router, pathname]);
 
   useEffect(() => {
+    // Only run on web
+    if (Platform.OS !== 'web' || typeof window === 'undefined') {
+      return;
+    }
+
     window.parent.postMessage(
       {
         type: 'sandbox:mobile:navigation',
@@ -107,7 +127,7 @@ const CreateApp = () => {
   return (
     <>
       <Wrapper />
-      <AlertModal />
+      {Platform.OS === 'web' && <AlertModal />}
     </>
   );
 };

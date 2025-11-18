@@ -1,3 +1,8 @@
+// Debug: Check environment variables at config load time
+console.log('🔍 [app.config.js] Environment check:');
+console.log('  EXPO_PUBLIC_SUPABASE_URL:', process.env.EXPO_PUBLIC_SUPABASE_URL ? '✓ Set (' + process.env.EXPO_PUBLIC_SUPABASE_URL.substring(0, 30) + '...)' : '✗ Missing');
+console.log('  EXPO_PUBLIC_SUPABASE_ANON_KEY:', process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ? '✓ Set (' + process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY.substring(0, 20) + '...)' : '✗ Missing');
+
 export default {
   expo: {
     name: "FeedMyFluff",
@@ -9,10 +14,21 @@ export default {
     scheme: "feedmyfluff",
     newArchEnabled: true,
     ios: {
-      bundleIdentifier: "com.jinrixlabs.feedmyfluff",
+      bundleIdentifier: "io.jinrix.feedmyfluff",
       supportsTablet: true,
+      buildNumber: "1",
+      deploymentTarget: "15.1",
       infoPlist: {
-        ITSAppUsesNonExemptEncryption: false
+        ITSAppUsesNonExemptEncryption: false,
+        NSPhotoLibraryUsageDescription: "This app needs access to your photo library to select pet photos.",
+        NSCameraUsageDescription: "This app needs access to your camera to take photos of your pets.",
+        NSPhotoLibraryAddUsageDescription: "This app needs permission to save photos to your library.",
+        NSLocationWhenInUseUsageDescription: "This app uses location to help you find nearby pet services.",
+        NSContactsUsageDescription: "This app needs access to contacts to help you share with family members.",
+        NSCalendarsUsageDescription: "This app needs access to your calendar to manage feeding reminders.",
+        NSRemindersUsageDescription: "This app needs access to reminders to set feeding schedules.",
+        NSMicrophoneUsageDescription: "This app needs microphone access for audio features.",
+        NSUserNotificationsUsageDescription: "This app needs notification permissions to remind you about feeding times."
       }
     },
     android: {
@@ -24,7 +40,7 @@ export default {
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
-      package: "com.feedmyfluff.app"
+      package: "io.jinrix.feedmyfluff"
     },
     plugins: [
       [
@@ -52,7 +68,16 @@ export default {
       ],
       "expo-video",
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          icon: "./assets/images/notification-icon.png",
+          color: "#744BFF",
+          sounds: [],
+          mode: "production"
+        }
+      ]
     ],
     web: {
       bundler: "metro",

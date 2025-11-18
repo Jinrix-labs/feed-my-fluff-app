@@ -1,20 +1,33 @@
-import { supabase } from "./supabase";
+import { getSupabase } from "./supabase";
 
 /**
  * Add a feed entry
  * @param {Object} feed - Feed data including group_id, pet_id, food_type, etc.
  */
 export async function addFeed(feed) {
+  const supabase = await getSupabase();
+  if (!supabase) throw new Error("Supabase not initialized");
+
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("User not authenticated");
 
-  const { data, error } = await supabase
+  // Insert without select to avoid relationship detection
+  const { data: insertData, error: insertError } = await supabase
     .from("feeds")
     .insert({
       ...feed,
       fed_by: user.id,
     })
-    .select()
+    .select("id")
+    .single();
+
+  if (insertError) throw insertError;
+
+  // Then fetch the full record using minimal query
+  const { data, error } = await supabase
+    .from("feeds")
+    .select("id, food_type, fed_at, notes, group_id, family_member_id, pet_id")
+    .eq("id", insertData.id)
     .single();
 
   if (error) throw error;
@@ -28,6 +41,10 @@ export async function addFeed(feed) {
 export async function getFeeds(groupId) {
   if (!groupId) throw new Error("Group ID is required");
 
+  const supabase = await getSupabase();
+  if (!supabase) throw new Error("Supabase not initialized");
+
+  // Use Supabase relationship syntax with explicit column names
   const { data, error } = await supabase
     .from("feeds")
     .select(`
@@ -35,20 +52,24 @@ export async function getFeeds(groupId) {
       food_type,
       fed_at,
       notes,
-      group_id,
-      fed_by,
-      family_members(name, emoji),
-      pets(name, emoji),
-      users:fed_by (
+      family_members:family_member_id (
         id,
-        email,
-        raw_user_meta_data
+        name,
+        emoji
+      ),
+      pets:pet_id (
+        id,
+        name,
+        emoji
       )
     `)
     .eq("group_id", groupId)
     .order("fed_at", { ascending: false });
 
-  if (error) throw error;
+  if (error) {
+    throw new Error(`Failed to fetch feeds: ${error.message || JSON.stringify(error)}`);
+  }
+
   return data || [];
 }
 
@@ -56,6 +77,9 @@ export async function getFeeds(groupId) {
  * Delete a feed entry (only if user created it)
  */
 export async function deleteFeed(id) {
+  const supabase = await getSupabase();
+  if (!supabase) throw new Error("Supabase not initialized");
+
   const { error } = await supabase
     .from("feeds")
     .delete()
@@ -68,12 +92,18 @@ export async function deleteFeed(id) {
  * Subscribe to realtime updates for feeds in a group
  * @param {string} groupId - The family group ID
  * @param {Function} callback - Callback function when feeds change
- * @returns {Function} Unsubscribe function
+ * @returns {Promise<Function>} Promise that resolves to unsubscribe function
  */
-export function subscribeToFeeds(groupId, callback) {
+export async function subscribeToFeeds(groupId, callback) {
   if (!groupId) {
     console.warn("Cannot subscribe to feeds: groupId is required");
-    return () => {};
+    return () => { };
+  }
+
+  const supabase = await getSupabase();
+  if (!supabase) {
+    console.warn("Cannot subscribe to feeds: Supabase not initialized");
+    return () => { };
   }
 
   const channel = supabase

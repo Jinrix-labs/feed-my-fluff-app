@@ -12,7 +12,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/utils/theme";
-import { Plus, PawPrint, Clock, User, ChefHat, Heart } from "lucide-react-native";
+import { Plus, PawPrint, Clock, User, ChefHat, Heart, RefreshCw } from "lucide-react-native";
 import KeyboardAvoidingAnimatedView from "@/components/KeyboardAvoidingAnimatedView";
 import {
   useFonts,
@@ -151,6 +151,8 @@ export default function AddFeedScreen() {
 
   // ✅ Submit feed via Supabase
   const handleSubmit = async () => {
+    console.log('🔍 [AddFeed] handleSubmit called', { selectedFoodType, selectedMember, selectedPet, groupId });
+    
     if (!selectedFoodType || !selectedMember || !selectedPet) {
       Alert.alert("Missing Information", "Please select food type, who fed, and which pet.");
       return;
@@ -172,7 +174,9 @@ export default function AddFeedScreen() {
         notes: notes.trim() || null,
       };
 
-      await addFeed(feedData);
+      console.log('🔍 [AddFeed] Submitting feed data:', feedData);
+      const result = await addFeed(feedData);
+      console.log('🔍 [AddFeed] Feed submitted successfully:', result);
 
       const memberName = familyMembers.find(
         (m) => m.id === selectedMember
@@ -188,7 +192,7 @@ export default function AddFeedScreen() {
         ]
       );
     } catch (error) {
-      console.error("Feed submission error:", error);
+      console.error("❌ [AddFeed] Feed submission error:", error);
       Alert.alert("Error", `Failed to log feeding: ${error.message || error}`);
     } finally {
       setIsSubmitting(false);
@@ -313,29 +317,46 @@ export default function AddFeedScreen() {
         <View
           style={{ paddingHorizontal: 24, paddingTop: 16, paddingBottom: 24 }}
         >
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <View
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+              <View
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: colors.primaryBackground,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginRight: 12,
+                }}
+              >
+                <Plus size={20} color={colors.primary} />
+              </View>
+              <Text
+                style={{
+                  fontFamily: "Poppins_700Bold",
+                  fontSize: 24,
+                  color: colors.text,
+                }}
+              >
+                Add Feed
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={resetForm}
               style={{
-                width: 40,
-                height: 40,
-                borderRadius: 20,
-                backgroundColor: colors.primaryBackground,
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                backgroundColor: colors.surface,
+                borderWidth: 1,
+                borderColor: colors.border,
                 justifyContent: "center",
                 alignItems: "center",
-                marginRight: 12,
               }}
             >
-              <Plus size={20} color={colors.primary} />
-            </View>
-            <Text
-              style={{
-                fontFamily: "Poppins_700Bold",
-                fontSize: 24,
-                color: colors.text,
-              }}
-            >
-              Add Feed
-            </Text>
+              <RefreshCw size={20} color={colors.icon} />
+            </TouchableOpacity>
           </View>
           <Text
             style={{
@@ -565,8 +586,18 @@ export default function AddFeedScreen() {
           {/* Submit */}
           <View style={{ marginBottom: 24 }}>
             <TouchableOpacity
-              onPress={handleSubmit}
+              onPress={() => {
+                console.log('🔍 [AddFeed] Button pressed!', { 
+                  selectedFoodType, 
+                  selectedMember, 
+                  selectedPet, 
+                  isSubmitting,
+                  groupId 
+                });
+                handleSubmit();
+              }}
               disabled={!selectedFoodType || !selectedMember || !selectedPet || isSubmitting}
+              activeOpacity={0.7}
               style={{
                 backgroundColor:
                   !selectedFoodType || !selectedMember || !selectedPet || isSubmitting
@@ -582,6 +613,7 @@ export default function AddFeedScreen() {
                 shadowOpacity: 0.1,
                 shadowRadius: 8,
                 elevation: 3,
+                opacity: (!selectedFoodType || !selectedMember || !selectedPet || isSubmitting) ? 0.6 : 1,
               }}
             >
               <PawPrint size={20} color="#FFFFFF" style={{ marginRight: 8 }} />

@@ -24,8 +24,27 @@ export default function RootLayout() {
   const [showSplash, setShowSplash] = useState(true);
   const [splashComplete, setSplashComplete] = useState(false);
 
+  // Debug logging
+  useEffect(() => {
+    console.log('🔍 [RootLayout] State:', { loading, showSplash, splashComplete });
+  }, [loading, showSplash, splashComplete]);
+
+  // Fallback: Force hide splash after 5 seconds if animation doesn't complete
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (showSplash) {
+        console.warn('⚠️ [RootLayout] Splash screen timeout - forcing completion');
+        setShowSplash(false);
+        setSplashComplete(true);
+      }
+    }, 5000);
+
+    return () => clearTimeout(timeout);
+  }, [showSplash]);
+
   useEffect(() => {
     if (!loading && splashComplete) {
+      console.log('🔍 [RootLayout] Hiding splash screen');
       SplashScreen.hideAsync().catch(err => {
         console.error("Error hiding splash screen:", err);
       });
@@ -37,6 +56,7 @@ export default function RootLayout() {
     return (
       <AnimatedSplashScreen 
         onAnimationComplete={() => {
+          console.log('🔍 [RootLayout] Splash animation completed');
           setShowSplash(false);
           setSplashComplete(true);
         }} 
@@ -61,8 +81,8 @@ export default function RootLayout() {
           initialRouteName="index"
         >
           <Stack.Screen name="index" options={{ animation: "none" }} />
-          <Stack.Screen name="auth" options={{ animation: "fade" }} />
-          <Stack.Screen name="family-setup" options={{ animation: "fade" }} />
+          <Stack.Screen name="auth" options={{ animation: "none" }} />
+          <Stack.Screen name="family-setup" options={{ animation: "none" }} />
           <Stack.Screen name="(tabs)" options={{ animation: "none" }} />
           <Stack.Screen name="settings" options={{ animation: "fade" }} />
         </Stack>

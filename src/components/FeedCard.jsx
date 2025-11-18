@@ -136,7 +136,7 @@ export default function FeedCard({ feed, isAdmin, onEdit, onDelete }) {
           }}
         >
           <Text style={{ fontSize: 18, marginRight: 8 }}>
-            {getFamilyEmoji(feed.family_member_name)}
+            {feed.family_members?.emoji || getFamilyEmoji(feed.family_members?.name || "")}
           </Text>
           <Text
             style={{
@@ -145,7 +145,7 @@ export default function FeedCard({ feed, isAdmin, onEdit, onDelete }) {
               color: colors.textSecondary,
             }}
           >
-            Fed by {feed.family_member_name}
+            Fed by {feed.family_members?.name || "Unknown"}
           </Text>
         </View>
 

@@ -94,7 +94,7 @@ config.cacheStores = () => [
   }),
 ];
 config.resetCache = false;
-config.fileMapCacheDirectory = cacheDir;
+// fileMapCacheDirectory is deprecated, using watchFolders instead
 config.reporter = {
   ...config.reporter,
   update: (event) => {

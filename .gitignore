@@ -48,3 +48,4 @@ app-example
 # Metro cache
 caches/
 .expo/
+.expo-build-test/

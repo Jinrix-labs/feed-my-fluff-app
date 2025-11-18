@@ -1,9 +1,12 @@
-import { supabase } from "./supabase";
+import { getSupabase } from "./supabase";
 
 /**
  * Get all family groups for the current user
  */
 export async function getUserFamilyGroups() {
+  const supabase = await getSupabase();
+  if (!supabase) throw new Error("Supabase not initialized");
+  
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("User not authenticated");
 
@@ -37,8 +40,21 @@ export async function getActiveFamilyGroup() {
  * Create a new family group
  */
 export async function createFamilyGroup(name) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("User not authenticated");
+  const supabase = await getSupabase();
+  if (!supabase) throw new Error("Supabase not initialized");
+  
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError) {
+    console.error("❌ Auth error:", authError);
+    throw new Error(`Authentication error: ${authError.message}`);
+  }
+  if (!user) {
+    console.error("❌ No user found");
+    throw new Error("User not authenticated");
+  }
+
+  console.log("✅ User authenticated:", user.id);
+  console.log("📝 Creating family group:", name);
 
   // Create the group
   const { data: group, error: groupError } = await supabase
@@ -50,7 +66,13 @@ export async function createFamilyGroup(name) {
     .select()
     .single();
 
-  if (groupError) throw groupError;
+  if (groupError) {
+    console.error("❌ Error creating family group:", groupError);
+    console.error("   Code:", groupError.code);
+    console.error("   Message:", groupError.message);
+    console.error("   Details:", groupError.details);
+    throw groupError;
+  }
 
   // Add creator to the group
   const { error: joinError } = await supabase
@@ -69,6 +91,9 @@ export async function createFamilyGroup(name) {
  * Join a family group by invite code
  */
 export async function joinFamilyGroupByInviteCode(inviteCode) {
+  const supabase = await getSupabase();
+  if (!supabase) throw new Error("Supabase not initialized");
+  
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("User not authenticated");
 
@@ -112,6 +137,9 @@ export async function joinFamilyGroupByInviteCode(inviteCode) {
  * Get members of a family group
  */
 export async function getFamilyGroupMembers(groupId) {
+  const supabase = await getSupabase();
+  if (!supabase) throw new Error("Supabase not initialized");
+  
   const { data, error } = await supabase
     .from("user_family_groups")
     .select(`
@@ -133,6 +161,9 @@ export async function getFamilyGroupMembers(groupId) {
  * Leave a family group
  */
 export async function leaveFamilyGroup(groupId) {
+  const supabase = await getSupabase();
+  if (!supabase) throw new Error("Supabase not initialized");
+  
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("User not authenticated");
 

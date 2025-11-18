@@ -12,10 +12,17 @@ export function useRealtimeFeeds(groupId, onUpdate) {
   useEffect(() => {
     if (!groupId) return;
 
-    // Subscribe to realtime updates
-    unsubscribeRef.current = subscribeToFeeds(groupId, (payload) => {
+    let unsubscribe = null;
+
+    // Subscribe to realtime updates (async)
+    subscribeToFeeds(groupId, (payload) => {
       // Call the callback with the payload
       onUpdate(payload);
+    }).then((unsub) => {
+      unsubscribeRef.current = unsub;
+      unsubscribe = unsub;
+    }).catch((error) => {
+      console.error("Error subscribing to feeds:", error);
     });
 
     // Cleanup on unmount or groupId change
@@ -23,6 +30,9 @@ export function useRealtimeFeeds(groupId, onUpdate) {
       if (unsubscribeRef.current) {
         unsubscribeRef.current();
         unsubscribeRef.current = null;
+      }
+      if (unsubscribe) {
+        unsubscribe();
       }
     };
   }, [groupId, onUpdate]);

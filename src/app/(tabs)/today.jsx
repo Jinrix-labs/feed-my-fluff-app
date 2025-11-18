@@ -117,7 +117,7 @@ export default function TodayScreen() {
   const handleEdit = (feed) => {
     Alert.alert(
       "Edit Feed",
-      `Edit feed entry for ${feed.food_type} by ${feed.family_member_name}?`,
+      `Edit feed entry for ${feed.food_type} by ${feed.family_members?.name || "Unknown"}?`,
       [
         { text: "Cancel", style: "cancel" },
         {

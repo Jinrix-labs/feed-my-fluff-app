@@ -18,6 +18,9 @@ import {
   Poppins_700Bold,
 } from "@expo-google-fonts/poppins";
 import { getFeeds } from "@/lib/feeds";
+import { getActiveFamilyGroup } from "@/lib/familyGroups";
+import { useRealtimeFeeds } from "@/utils/useRealtimeFeeds";
+import { Alert } from "react-native";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -26,6 +29,7 @@ export default function StatisticsScreen() {
   const { colors, isDark } = useTheme();
   const [statistics, setStatistics] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [groupId, setGroupId] = useState(null);
 
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
@@ -34,12 +38,51 @@ export default function StatisticsScreen() {
     Poppins_700Bold,
   });
 
+  // Get active family group and fetch statistics
+  useEffect(() => {
+    const initializeGroup = async () => {
+      try {
+        const group = await getActiveFamilyGroup();
+        if (group) {
+          setGroupId(group.id);
+          await fetchStatistics(group.id);
+        } else {
+          setLoading(false);
+          Alert.alert(
+            "No Family Group",
+            "Please create or join a family group to view statistics.",
+            [{ text: "OK" }]
+          );
+        }
+      } catch (error) {
+        console.error("Error initializing group:", error);
+        setLoading(false);
+        Alert.alert(
+          "Error",
+          `Failed to load family group: ${error.message || error}`
+        );
+      }
+    };
+
+    initializeGroup();
+  }, []);
+
+  // Subscribe to realtime feed updates
+  useRealtimeFeeds(groupId, (payload) => {
+    // Refresh statistics when any feed change occurs (INSERT, UPDATE, DELETE)
+    if (groupId) {
+      fetchStatistics(groupId);
+    }
+  });
+
   // Fetch statistics from Supabase
-  const fetchStatistics = async () => {
+  const fetchStatistics = async (activeGroupId) => {
+    if (!activeGroupId) return;
+    
+    setLoading(true);
     try {
-      // For now, we'll compute statistics from feeds data
-      // You can create a statistics helper later if needed
-      const feeds = await getFeeds();
+      // Get feeds for the active group
+      const feeds = await getFeeds(activeGroupId);
       
       // Calculate statistics from feeds
       const today = new Date();
@@ -49,28 +92,75 @@ export default function StatisticsScreen() {
         (feed) => new Date(feed.fed_at) >= today
       );
       
+      // Calculate trends (last 7 days)
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      sevenDaysAgo.setHours(0, 0, 0, 0);
+      
+      const recentFeeds = feeds.filter(
+        (feed) => new Date(feed.fed_at) >= sevenDaysAgo
+      );
+      
+      // Group by date for trends
+      const trendsMap = new Map();
+      recentFeeds.forEach((feed) => {
+        const date = new Date(feed.fed_at).toISOString().split('T')[0];
+        trendsMap.set(date, (trendsMap.get(date) || 0) + 1);
+      });
+      
+      const trends = Array.from(trendsMap.entries())
+        .map(([feed_date, feed_count]) => ({ feed_date, feed_count }))
+        .sort((a, b) => a.feed_date.localeCompare(b.feed_date));
+      
+      // Calculate food types
+      const foodTypesMap = new Map();
+      feeds.forEach((feed) => {
+        const type = feed.food_type || 'Unknown';
+        foodTypesMap.set(type, (foodTypesMap.get(type) || 0) + 1);
+      });
+      
+      const foodTypes = Array.from(foodTypesMap.entries())
+        .map(([food_type, count]) => ({ food_type, count }))
+        .sort((a, b) => b.count - a.count);
+      
+      // Calculate family member stats
+      const memberMap = new Map();
+      feeds.forEach((feed) => {
+        const member = feed.family_members;
+        if (member) {
+          const key = member.name || 'Unknown';
+          if (!memberMap.has(key)) {
+            memberMap.set(key, { name: key, emoji: member.emoji || '👤', feed_count: 0 });
+          }
+          memberMap.get(key).feed_count++;
+        }
+      });
+      
+      const familyMembers = Array.from(memberMap.values())
+        .sort((a, b) => b.feed_count - a.feed_count);
+      
       const stats = {
         today: {
           total_feeds: todayFeeds.length,
-          family_members_fed: new Set(todayFeeds.map((f) => f.family_member_id)).size,
+          family_members_fed: new Set(todayFeeds.map((f) => f.family_members?.name).filter(Boolean)).size,
         },
         averagePerDay: feeds.length > 0 ? Math.round(feeds.length / 30) : "0",
-        trends: [], // Can be calculated from feeds
-        foodTypes: [], // Can be calculated from feeds
-        familyMembers: [], // Can be calculated from feeds
+        trends,
+        foodTypes,
+        familyMembers,
       };
       
       setStatistics(stats);
     } catch (error) {
       console.error("Error fetching statistics:", error);
+      Alert.alert(
+        "Error",
+        `Failed to fetch statistics: ${error.message || error}`
+      );
     } finally {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    fetchStatistics();
-  }, []);
 
   if (!fontsLoaded) {
     return (
