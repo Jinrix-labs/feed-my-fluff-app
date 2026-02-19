@@ -11,6 +11,7 @@ import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/utils/theme";
+import { useSupabaseAuth } from "@/utils/auth/useSupabaseAuth";
 import {
   Settings,
   ArrowLeft,
@@ -20,6 +21,8 @@ import {
   Trash2,
   Info,
   Shield,
+  LogOut,
+  UserX,
 } from "lucide-react-native";
 import {
   useFonts,
@@ -33,6 +36,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { colors, isDark } = useTheme();
+  const { signOut, deleteAccount } = useSupabaseAuth();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [loading, setLoading] = useState(false);
 
@@ -85,6 +89,74 @@ export default function SettingsScreen() {
           onPress: async () => {
             // TODO: Implement data clearing
             Alert.alert("Success", "All data has been cleared.");
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSignOut = () => {
+    Alert.alert(
+      "Sign Out",
+      "Are you sure you want to sign out? You'll need to sign in again to access your data.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Sign Out",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await signOut();
+              router.replace("/auth");
+            } catch (error) {
+              console.error("Error signing out:", error);
+              Alert.alert("Error", "Failed to sign out. Please try again.");
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete Account",
+      "Are you sure you want to permanently delete your account? All your data will be removed and this cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete Account",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "Final confirmation",
+              "This will permanently delete your account and all associated data. Are you sure?",
+              [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Yes, delete my account",
+                  style: "destructive",
+                  onPress: async () => {
+                    try {
+                      setLoading(true);
+                      await deleteAccount();
+                      router.replace("/auth");
+                    } catch (error) {
+                      console.error("Error deleting account:", error);
+                      const message =
+                        error?.message ||
+                        "Failed to delete account. If you have uploaded files, try removing them first.";
+                      Alert.alert("Error", message);
+                    } finally {
+                      setLoading(false);
+                    }
+                  },
+                },
+              ]
+            );
           },
         },
       ]
@@ -316,6 +388,36 @@ export default function SettingsScreen() {
             title="Clear All Data"
             subtitle="Delete all feeds, reminders, and settings"
             onPress={handleClearData}
+            showArrow={true}
+          />
+        </View>
+
+        {/* Account */}
+        <View style={{ marginBottom: 32 }}>
+          <Text
+            style={{
+              fontFamily: "Poppins_600SemiBold",
+              fontSize: 14,
+              color: colors.textSecondary,
+              marginBottom: 12,
+              textTransform: "uppercase",
+              letterSpacing: 0.5,
+            }}
+          >
+            Account
+          </Text>
+          <SettingItem
+            icon={LogOut}
+            title="Sign Out"
+            subtitle="Sign out of your account"
+            onPress={handleSignOut}
+            showArrow={true}
+          />
+          <SettingItem
+            icon={UserX}
+            title="Delete Account"
+            subtitle="Permanently delete your account and all data"
+            onPress={handleDeleteAccount}
             showArrow={true}
           />
         </View>

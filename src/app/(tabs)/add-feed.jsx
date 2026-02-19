@@ -63,7 +63,7 @@ export default function AddFeedScreen() {
     
     try {
       const [familyData, petsData] = await Promise.all([
-        getFamily(),
+        getFamily(activeGroupId),
         getPets(activeGroupId),
       ]);
       setFamilyMembers(familyData);

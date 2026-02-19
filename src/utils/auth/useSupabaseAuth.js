@@ -103,11 +103,39 @@ export function useSupabaseAuth() {
     }
   };
 
+  /**
+   * Delete the current user's account (Apple App Store requirement for apps with sign-up).
+   * Calls the Supabase Edge Function "delete-account" which uses the service role to delete the user.
+   * After deletion, the user is signed out and should be redirected to /auth.
+   */
+  const deleteAccount = async () => {
+    const supabase = await getSupabase();
+    if (!supabase) {
+      throw new Error("Not connected");
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
+      throw new Error("Not signed in");
+    }
+    const { data, error } = await supabase.functions.invoke("delete-account", {
+      body: {},
+    });
+    if (error) {
+      throw error;
+    }
+    if (data?.error) {
+      throw new Error(data.error);
+    }
+    await supabase.auth.signOut();
+    return data;
+  };
+
   return {
     session,
     user: session?.user ?? null,
     loading,
     signOut,
+    deleteAccount,
     isAuthenticated: !!session,
   };
 }

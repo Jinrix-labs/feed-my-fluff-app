@@ -115,7 +115,7 @@ export default function FamilyScreen() {
     setLoading(!hasLoadedFamilyData);
     try {
       const [familyData, petsData] = await Promise.all([
-        getFamily(),
+        getFamily(activeGroupId),
         getPets(activeGroupId),
       ]);
       updateFamilyMembers(familyData || []);
@@ -165,7 +165,9 @@ export default function FamilyScreen() {
       const newMember = await addFamilyMember({
         name: memberFormData.name.trim(),
         emoji: memberFormData.emoji,
-        is_admin: false,
+        group_id: groupId,
+        // is_admin will be added after running the SQL migration
+        // For now, omit it to avoid schema cache errors
       });
       updateFamilyMembers((prev) => [...prev, newMember]);
       closeMemberModal();
