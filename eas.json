@@ -25,7 +25,8 @@
 			},
 			"ios": {
 				"simulator": false,
-				"buildConfiguration": "Release"
+				"buildConfiguration": "Release",
+				"image": "macos-sequoia-15.5-xcode-26.0"
 			},
 			"env": {
 				"EXPO_PUBLIC_SUPABASE_URL": "https://mqmbequgylfucqdlxcif.supabase.co",
@@ -40,7 +41,8 @@
 			},
 			"ios": {
 				"simulator": false,
-				"buildConfiguration": "Release"
+				"buildConfiguration": "Release",
+				"image": "macos-sequoia-15.5-xcode-26.0"
 			}
 		},
 		"production-apk": {
